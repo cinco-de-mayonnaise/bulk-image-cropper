@@ -18,6 +18,9 @@ class ImageCropperApp:
         self.original_image = None
         self.crop_rect = None
         self.rect_id = None
+
+        # Store crop positions per image
+        self.image_crop_positions = {}  
         
         # Variables for dragging
         self.dragging = False
@@ -126,6 +129,11 @@ class ImageCropperApp:
     def load_current_image(self):
         if 0 <= self.current_image_index < len(self.images):
             try:
+                # Save the current crop position before loading the new image
+                if self.original_image and self.images and self.current_image_index >= 0:
+                    current_image_path = self.images[self.current_image_index]
+                    self.image_crop_positions[current_image_path] = self.crop_rect
+
                 self.original_image = Image.open(self.images[self.current_image_index])
                 self.display_image()
                 self.status_label.config(text=f"Image {self.current_image_index + 1} of {len(self.images)}")
@@ -187,17 +195,27 @@ class ImageCropperApp:
         crop_width_display = int(target_width * self.display_scale)
         crop_height_display = int(target_height * self.display_scale)
         
-        # Calculate initial position (centered)
-        x_offset = max(0, (self.image_size[0] - crop_width_display) // 2)
-        y_offset = max(0, (self.image_size[1] - crop_height_display) // 2)
+        # Try to use saved position
+        current_image_path = self.images[self.current_image_index]
+        saved_position = self.image_crop_positions.get(current_image_path)
         
-        x1 = self.image_pos[0] + x_offset
-        y1 = self.image_pos[1] + y_offset
-        x2 = x1 + crop_width_display
-        y2 = y1 + crop_height_display
-        
-        # Ensure the rectangle is fully within the image bounds
-        x1, y1, x2, y2 = self.constrain_rect_to_image(x1, y1, x2, y2)
+        if saved_position:
+            # Use saved position
+            x1, y1, x2, y2 = saved_position
+            # Ensure the rectangle is fully within the image bounds
+            x1, y1, x2, y2 = self.constrain_rect_to_image(x1, y1, x2, y2)
+        else:
+            # Calculate initial position (centered)
+            x_offset = max(0, (self.image_size[0] - crop_width_display) // 2)
+            y_offset = max(0, (self.image_size[1] - crop_height_display) // 2)
+            
+            x1 = self.image_pos[0] + x_offset
+            y1 = self.image_pos[1] + y_offset
+            x2 = x1 + crop_width_display
+            y2 = y1 + crop_height_display
+            
+            # Ensure the rectangle is fully within the image bounds
+            x1, y1, x2, y2 = self.constrain_rect_to_image(x1, y1, x2, y2)
         
         # Draw the rectangle
         self.rect_id = self.canvas.create_rectangle(
@@ -314,7 +332,7 @@ class ImageCropperApp:
             
             save_path = filedialog.asksaveasfilename(
                 title="Save Cropped Image",
-                initialfile=f"{name}_cropped{ext}",
+                initialfile=f"{name}_circumsized{ext}",
                 defaultextension=ext,
                 filetypes=[("Image files", f"*{ext}")]
             )
@@ -331,6 +349,58 @@ class ImageCropperApp:
             
         except Exception as e:
             messagebox.showerror("Error", f"Error saving cropped image: {str(e)}")
+
+    def auto_save_crop(self):
+        """Save circumcision automatically without dialog when navigating"""
+        if not self.crop_rect or not self.original_image:
+            return
+            
+        # Convert canvas coordinates to original image coordinates
+        x1, y1, x2, y2 = self.crop_rect
+        x1 = max(0, x1 - self.image_pos[0])
+        y1 = max(0, y1 - self.image_pos[1])
+        x2 = min(self.image_size[0], x2 - self.image_pos[0])
+        y2 = min(self.image_size[1], y2 - self.image_pos[1])
+        
+        # Scale back to original image size
+        scale = 1.0 / self.display_scale
+        
+        x1_orig = int(x1 * scale)
+        y1_orig = int(y1 * scale)
+        x2_orig = int(x2 * scale)
+        y2_orig = int(y2 * scale)
+        
+        try:
+            # Circumsize the image
+            cropped = self.original_image.crop((x1_orig, y1_orig, x2_orig, y2_orig))
+            
+            # Resize to target size
+            target_width = self.target_width.get()
+            target_height = self.target_height.get()
+            cropped = cropped.resize((target_width, target_height), Image.LANCZOS)
+            
+            # Auto-generate save path
+            original_path = self.images[self.current_image_index]
+            dir_name = os.path.dirname(original_path)
+            file_name = os.path.basename(original_path)
+            name, ext = os.path.splitext(file_name)
+            
+            # Create output directory if needed
+            output_dir = os.path.join(dir_name, "circumsized")
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Generate unique filename
+            save_path = os.path.join(output_dir, f"{name}_circumsized{ext}")
+            count = 1
+            while os.path.exists(save_path):
+                save_path = os.path.join(output_dir, f"{name}_circumsized_{count}{ext}")
+                count += 1
+                
+            cropped.save(save_path)
+            self.status_label.config(text=f"Auto-saved to: {os.path.basename(save_path)}")
+            
+        except Exception as e:
+            messagebox.showerror("Auto-Save Error", f"Error saving circumsized image: {str(e)}")
     
     def previous_image(self):
         if self.current_image_index > 0:
@@ -340,6 +410,8 @@ class ImageCropperApp:
     
     def next_image(self):
         if self.current_image_index < len(self.images) - 1:
+            # Auto-save current crop before moving to next
+            self.auto_save_crop()
             self.current_image_index += 1
             self.load_current_image()
             self.update_navigation_buttons()
