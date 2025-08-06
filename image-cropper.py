@@ -332,7 +332,7 @@ class ImageCropperApp:
             
             save_path = filedialog.asksaveasfilename(
                 title="Save Cropped Image",
-                initialfile=f"{name}_cropped{ext}",
+                initialfile=f"{name}_circumsized{ext}",
                 defaultextension=ext,
                 filetypes=[("Image files", f"*{ext}")]
             )
