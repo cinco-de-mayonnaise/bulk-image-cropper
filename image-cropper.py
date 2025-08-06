@@ -410,6 +410,8 @@ class ImageCropperApp:
     
     def next_image(self):
         if self.current_image_index < len(self.images) - 1:
+            # Auto-save current crop before moving to next
+            self.auto_save_crop()
             self.current_image_index += 1
             self.load_current_image()
             self.update_navigation_buttons()
