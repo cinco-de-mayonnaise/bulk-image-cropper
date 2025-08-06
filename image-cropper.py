@@ -18,6 +18,9 @@ class ImageCropperApp:
         self.original_image = None
         self.crop_rect = None
         self.rect_id = None
+
+        # Store crop positions per image
+        self.image_crop_positions = {}  
         
         # Variables for dragging
         self.dragging = False
@@ -126,6 +129,11 @@ class ImageCropperApp:
     def load_current_image(self):
         if 0 <= self.current_image_index < len(self.images):
             try:
+                # Save the current crop position before loading the new image
+                if self.original_image and self.images and self.current_image_index >= 0:
+                    current_image_path = self.images[self.current_image_index]
+                    self.image_crop_positions[current_image_path] = self.crop_rect
+
                 self.original_image = Image.open(self.images[self.current_image_index])
                 self.display_image()
                 self.status_label.config(text=f"Image {self.current_image_index + 1} of {len(self.images)}")
