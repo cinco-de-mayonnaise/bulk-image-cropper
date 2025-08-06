@@ -195,17 +195,27 @@ class ImageCropperApp:
         crop_width_display = int(target_width * self.display_scale)
         crop_height_display = int(target_height * self.display_scale)
         
-        # Calculate initial position (centered)
-        x_offset = max(0, (self.image_size[0] - crop_width_display) // 2)
-        y_offset = max(0, (self.image_size[1] - crop_height_display) // 2)
+        # Try to use saved position
+        current_image_path = self.images[self.current_image_index]
+        saved_position = self.image_crop_positions.get(current_image_path)
         
-        x1 = self.image_pos[0] + x_offset
-        y1 = self.image_pos[1] + y_offset
-        x2 = x1 + crop_width_display
-        y2 = y1 + crop_height_display
-        
-        # Ensure the rectangle is fully within the image bounds
-        x1, y1, x2, y2 = self.constrain_rect_to_image(x1, y1, x2, y2)
+        if saved_position:
+            # Use saved position
+            x1, y1, x2, y2 = saved_position
+            # Ensure the rectangle is fully within the image bounds
+            x1, y1, x2, y2 = self.constrain_rect_to_image(x1, y1, x2, y2)
+        else:
+            # Calculate initial position (centered)
+            x_offset = max(0, (self.image_size[0] - crop_width_display) // 2)
+            y_offset = max(0, (self.image_size[1] - crop_height_display) // 2)
+            
+            x1 = self.image_pos[0] + x_offset
+            y1 = self.image_pos[1] + y_offset
+            x2 = x1 + crop_width_display
+            y2 = y1 + crop_height_display
+            
+            # Ensure the rectangle is fully within the image bounds
+            x1, y1, x2, y2 = self.constrain_rect_to_image(x1, y1, x2, y2)
         
         # Draw the rectangle
         self.rect_id = self.canvas.create_rectangle(
