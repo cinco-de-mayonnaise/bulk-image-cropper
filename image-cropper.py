@@ -349,6 +349,58 @@ class ImageCropperApp:
             
         except Exception as e:
             messagebox.showerror("Error", f"Error saving cropped image: {str(e)}")
+
+    def auto_save_crop(self):
+        """Save circumcision automatically without dialog when navigating"""
+        if not self.crop_rect or not self.original_image:
+            return
+            
+        # Convert canvas coordinates to original image coordinates
+        x1, y1, x2, y2 = self.crop_rect
+        x1 = max(0, x1 - self.image_pos[0])
+        y1 = max(0, y1 - self.image_pos[1])
+        x2 = min(self.image_size[0], x2 - self.image_pos[0])
+        y2 = min(self.image_size[1], y2 - self.image_pos[1])
+        
+        # Scale back to original image size
+        scale = 1.0 / self.display_scale
+        
+        x1_orig = int(x1 * scale)
+        y1_orig = int(y1 * scale)
+        x2_orig = int(x2 * scale)
+        y2_orig = int(y2 * scale)
+        
+        try:
+            # Circumsize the image
+            cropped = self.original_image.crop((x1_orig, y1_orig, x2_orig, y2_orig))
+            
+            # Resize to target size
+            target_width = self.target_width.get()
+            target_height = self.target_height.get()
+            cropped = cropped.resize((target_width, target_height), Image.LANCZOS)
+            
+            # Auto-generate save path
+            original_path = self.images[self.current_image_index]
+            dir_name = os.path.dirname(original_path)
+            file_name = os.path.basename(original_path)
+            name, ext = os.path.splitext(file_name)
+            
+            # Create output directory if needed
+            output_dir = os.path.join(dir_name, "circumsized")
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Generate unique filename
+            save_path = os.path.join(output_dir, f"{name}_circumsized{ext}")
+            count = 1
+            while os.path.exists(save_path):
+                save_path = os.path.join(output_dir, f"{name}_circumsized_{count}{ext}")
+                count += 1
+                
+            cropped.save(save_path)
+            self.status_label.config(text=f"Auto-saved to: {os.path.basename(save_path)}")
+            
+        except Exception as e:
+            messagebox.showerror("Auto-Save Error", f"Error saving circumsized image: {str(e)}")
     
     def previous_image(self):
         if self.current_image_index > 0:
